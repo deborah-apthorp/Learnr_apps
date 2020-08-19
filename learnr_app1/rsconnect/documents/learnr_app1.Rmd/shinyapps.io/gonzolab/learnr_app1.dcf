@@ -5,8 +5,8 @@ account: gonzolab
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 2684057
-bundleId: 3532877
+bundleId: 3532921
 url: https://gonzolab.shinyapps.io/learnr_app1/
-when: 1597819767.79175
+when: 1597820747.21798
 asMultiple: FALSE
 asStatic: FALSE
