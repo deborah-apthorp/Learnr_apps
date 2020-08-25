@@ -1,0 +1,445 @@
+---
+title: "ANOVA made easy tutorial"
+output: 
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+description: "Learn How to compute within-subjects ANOVAs using `afex` in R"
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(tidyr)
+library(afex)
+library(emmeans)
+library(ggplot2)
+angle_noise <- read.csv('angle-noise_wide.csv')
+data(angle_noise)
+knitr::opts_chunk$set(echo = FALSE)
+
+```
+## Introduction 
+
+In this tutorial, we'll learn to calculate ANOVAs using the super-easy and aptly named `aov_ez` command from the `afex` package, as well as calculating estimated marginal means using `emmeans` and plotting the data, both natively in `afex` and using `ggplot2`. This tutorial is based heavily on Mattan S. Ben-Shachar's materials, available at [Analysis of Factorial Designs FoR Psychologists](https://github.com/mattansb/Analysis-of-Factorial-Designs-foR-Psychologists). 
+
+![Easy!](https://media.giphy.com/media/3ohhwhLRprHtEWzi1O/giphy.gif){width=80%}
+
+## The data
+
+We will be using the `angle-noise` data here.  This is data from a reaction time experiment where participants had to categorise an object. The object could be at an angle of 0, 4 or 8 degrees, and could appear with or without added visual noise (`absent` or `present`). It's currently in "wide" format, which is more user-friendly for looking at in a spreadsheet, but not always useful for `R` data analysis, so we'll look at how to wrangle it into long format for the ANOVA analysis. 
+
+![Long vs. wide data](https://sebastiansauer.github.io/images/gather_values.png){width=80%}
+
+
+### Importing and preparing the data 
+
+For ANOVAs we need to prepare our data in two ways:
+
+ 1. If we have many observations per subject / condition, we must aggregate
+   the data to a single value per subject / condition. This can be done with,
+   for example, one of the following:
+   
+`aggregate()`
+  
+`dplyr`'s `summarise()`
+  
+`prepdat`'s `prep()`
+  
+(Note: if you're using (G)LMMs you can, but don't have to aggregate.
+    
+ 2. The data must be in the long format.
+ 
+ We have imported the data at the top using the code `angle_noise <- read.csv('angle-noise_wide.csv')` - but it is in wide format
+
+### Wide vs long data.
+
+ WIDE DATA has:
+ 
+ 1. A row for each subject,
+ 
+ 2. Between-subject variables have a column
+ 
+ 3. Repeated measures are stored across columns, and the within-subject are stored in column names
+
+
+### Exercise 1: Look at the data (with Hint)
+
+Let's have a look at this dataset. If we just type in the name of the data, we can see a whole bunch of rows and columns. Let's look at just the first few rows. 
+
+Modify the following code to limit the number of rows printed to 6:
+
+```{r print-limit, exercise=TRUE, exercise.eval=TRUE}
+angle_noise
+```
+
+```{r print-limit-hint}
+head(angle_noise)
+```
+ 
+## Wrangling the data
+
+LONG DATA (also known as 'tidy data'), has:
+ 
+1. One *row* for each *OBSERVATION*,
+
+2. A *column* for each *variable* (including the subject ID!)
+
+3. Repeated measures are stored *across rows*.
+
+
+### Example 1: Convert wide data to long.  
+
+So we need to convert the long data into wide data (check out the data wrangling tutorials if you want to know more about this). We'll use `tidyr` and `pivot_longer` to do this, and call the new factor columns "noise" and "angle", and the outcome variable "rt" for reaction time. 
+
+Add some code at the bottom so you can have a look at the data! 
+
+```{r wide-to-long, exercise=TRUE, exercise.eval = TRUE}
+# use tidyr and pivot_longer to make the data long
+long_angle_noise <- angle_noise %>%
+  pivot_longer(
+    cols = absent_angle0:present_angle8,
+    names_to = c("noise", "angle"),
+    names_sep = "_",
+    values_to = 'rt'
+    )
+# look at the data
+
+```
+
+## Doing ANOVAs the wrong way
+
+### 2-Way Anova 
+
+At first you might think that it's easy to run ANOVAs in R. After all, regressions are easy! And it sure looks like it...
+
+### Example 2: Between subjects effects: 
+
+We can get the between-subjects effects using `aov`: 
+
+```{r between-subjects, exercise = TRUE}
+## fit the data
+fit_between <- aov(rt ~ angle * noise,
+                   data = long_angle_noise)
+
+## show a summary of the fit
+summary(fit_between)
+
+```
+
+
+### Example 3: Within subjects effects: 
+
+```{r within-subjects, exercise = TRUE}
+
+## fit the data
+fit_within <- aov(rt ~ angle * noise + Error(id / (angle * noise)),
+                  data = long_angle_noise)
+## show a summary of the fit
+summary(fit_within)
+```
+
+But... As it turns out, ANOVAs are harder than you think. An both of the ANOVA tables from the models above aren't showing us the results we want. And that matters. ***A lot***.
+
+So...
+
+DON'T DO THIS! 
+
+## Doing ANOVAs the right way
+
+For proper ANOVA tables, we need two things:
+
+1. effects coding for factors ("centering" factors)
+
+2. type 3 errors.*
+
+**However, by default, R uses treatment coding for factors, and Type 1 errors!**
+
+If you have no idea what I'm even talking about, that's okay - you don't need to - just remember that without these, ANOVA tables will be very misleading - Especially when you have unbalanced data. (This is true of any ANOVA table, in GLM, LMM, GLMM, etc...)
+
+So how can we do this? Well... it's not that easy...
+
+### Unless.... 
+
+Unless you use `afex`!
+
+ * Read more about type 1, 2 & 3 errors [here](http://md.psych.bio.uni-goettingen.de/mv/unit/lm_cat/lm_cat_unbal_ss_explained.html)
+ 
+ Run the code below to see a simple fit for the data using `aov_ez` from the `afex` package! (Note: to see the fit, you'll have to amend the code very slightly)
+
+```{r anova-using-afex, exercise = TRUE, exercise.eval=TRUE}
+fit <- aov_ez(id = "id", dv = "rt",
+              within = c("angle", "noise"),
+              data = long_angle_noise)
+
+```
+
+
+```{r anova-using-afex-hint}
+fit <- aov_ez(id = "id", dv = "rt",
+              within = c("angle", "noise"),
+              data = long_angle_noise)
+fit
+```
+
+Note some defaults here...
+
+- correction of the degrees of freedom (set to Greenhouse-Geisser)
+
+- effect size (set to generalized eta squared)
+ 
+ 
+### Check your understanding so far
+
+Here are a couple of questions to check whether you can read the results: 
+
+```{r quiz1, echo=FALSE}
+quiz(
+    question("What is the dependent variable in this analysis?",
+    answer("id"),
+    answer("noise"),
+    answer("rt", correct = TRUE),
+    answer("angle")
+  ),
+  question("What is the F-value for the main effect of angle?",
+    answer("33.77"),
+    answer(".387"),
+    answer("40.72", correct = TRUE),
+    answer("<.001")
+  ),
+  question("What is the effect size for the interaction?",
+    answer(".188", correct = TRUE),
+    answer("45.31"),
+    answer("16.27"),
+    answer(".390")
+  )
+)
+```
+
+
+## Interactions and simple effects 
+
+This whole course will be focused on how to use `emmeans` - a package for follow-up analyses (simple effects, simple slopes, contrasts...). 
+
+Although we focus here on linear ANOVAs, you can use `emmeans` with GLM, HLM, GLMM,  Bayesian models, and much much more.
+
+We saw the interaction was significant.. so what now?
+
+Let's look at simple effects! You can use the function `joint_tests` to test simple effects. Amend the code below to show the simple effects of angle. 
+
+### Simple effects example 
+
+```{r simple-effects-1, exercise = TRUE}
+joint_tests(fit, by = "noise")
+```
+
+```{r simple-effects-1-hint}
+joint_tests(fit, by = "angle")
+```
+
+### Check your results
+
+```{r quiz2, echo=FALSE}
+quiz(
+    question("Is the effect of noise significant at an angle of 0 degrees?",
+    answer("What?"),
+    answer("Yes"),
+    answer("No", correct = TRUE),
+    answer("There is not enough information to tell this")
+  ),
+  question("What is the F-value for the effect of noise at 4 degrees?",
+    answer("1.252"),
+    answer("14.08"),
+    answer("31.308", correct = TRUE),
+    answer("76.191")
+  )
+)
+```
+
+
+
+We can also get the estimated marginal means using the `emmeans` command. Amnd the code below to get the estimated marginal means for `angle` at both levels of `noise` (hint: you need the `+` sign!)
+
+### Estimated marginal means example 
+
+```{r simple-effects-2, exercise = TRUE}
+emmeans(fit, ~ angle) # what does the error message mean? 
+
+```
+
+```{r simple-effects-2-hint}
+emmeans(fit, ~ angle + noise)
+
+```
+
+NOTE: these can be different from the raw means in the data - these are **estimates**! And that is OKAY!
+
+### Check your understanding! 
+
+```{r quiz3, echo=FALSE}
+quiz(
+    question("What is the estimated mean reaction time at 8 degrees when noise is absent?",
+    answer("462"),
+    answer("528", correct = TRUE),
+    answer("762"),
+    answer("468")
+  ),
+  
+  question("What is the lower estimate of the confidence interval at 0 degrees when noise is present?",
+    answer("402"),
+    answer("432", correct = TRUE),
+    answer("552"),
+    answer("702")
+  ), 
+
+    question("Which condition had the *fastest* estimated mean reaction times?",
+    answer("8 degrees, noise present"),
+    answer("0 degrees, noise present"),
+    answer("There is not enough information to tell this"),
+    answer("0 degrees, noise absent", correct = TRUE)
+  )  
+  
+)
+```
+
+
+## Plot the data
+
+### Example: simple plotting function
+
+First, let's use a very simple plot to have a look at the data. Run the code below to see a basic plot using the `emmip` command. 
+
+```{r plot-data-1, exercise = TRUE}
+emmip(fit, noise ~ angle)
+
+```
+ 
+ (Again, remember these plots show the **estimated** means!)
+ 
+### Exercise: Add confidence intervals
+
+You can also show confidence intervals using `emmip`! Amend the code below to show CIs for angle at both levels of noise (absent and present). Does that get rid of the warning message? Why is that? 
+
+```{r plot-data-2, exercise = TRUE}
+
+emmip(fit, ~ angle, CIs = TRUE)
+
+```
+
+```{r plot-data-2-hint}
+
+emmip(fit, noise ~ angle, CIs = TRUE)
+
+```
+
+### Exercise: Use the help With afex
+
+We can do this within afex too, using `afex_plot`. Do you like this type of plot better? (Note that we have used `error = "within"` to make the CIs appropriate for the within-subjects design). 
+
+To find out more about afex plotting, try the help: `?afex_plot`
+
+```{r plot-data-3, exercise = TRUE}
+
+afex_plot(fit,  ~ angle,  ~ noise, error = "within")
+
+```
+
+## Using ggplot and emmeans
+
+Let's pass the estimated marginal means to an object called ems. (To see a summary of ems, what would you do?)
+
+```{r use-ggplot, exercise = TRUE, exercise.eval=TRUE}
+ems <- emmeans(fit,  ~ noise + angle) %>% 
+  summary()
+
+```
+
+```{r use-ggplot-hint}
+
+ems
+
+```
+
+Now let's plot the values in the ems object using ggplot! (To see this plot, just type its name at the bottom of the window.) 
+
+```{r ggplot-emmeans, exercise = TRUE, exercise.eval=TRUE }
+# basic plot
+p1 <- ggplot(ems, aes(angle, emmean, fill = noise, group = noise)) +
+  geom_col(position = position_dodge(.8),
+           width = .8) +
+  geom_point(position = position_dodge(.8)) +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL),
+                width = .1,
+                position = position_dodge(.8))
+```
+
+
+```{r ggplot-emmeans-hint}
+# basic plot
+p1 <- ggplot(ems, aes(angle, emmean, fill = noise, group = noise)) +
+  geom_col(position = position_dodge(.8),
+           width = .8) +
+  geom_point(position = position_dodge(.8)) +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL),
+                width = .1,
+                position = position_dodge(.8))
+p1
+```
+
+Now that we have a plot object (called p1), let's try making it prettier! GGplot works in layers, so we're going to add some more layers to give more information to the viewers. 
+
+- use `ggbeeswarm` to add individual data points from the original dataframe
+
+- alter the transparency of these using `alpha` (note: be careful of this when using the `psych` package simultaneously!)
+
+- add meaningful axis labels
+
+- change the default colours using `scale_fill_manual`
+
+- change the x-axis scale labels to be more concise
+
+- change the y-axis limits 
+
+- change the plot "theme" 
+
+- change the position of the legend
+
+See if you can play with the plot to change the colours, tinker with the axis labels, and so on. What happens if you comment out some of the lines? (For instance - what does `coord_cartesian` do? Try adding a `#` in front of that line and see what it does. Type `?coord_cartesian` to see the help. Can you change the colours? What other themes are there?)
+
+
+```{r ggplot-emmeans-pretty, exercise = TRUE}
+p1 +
+  ggbeeswarm::geom_beeswarm(
+    data = long_angle_noise,
+    aes(angle, rt, group = noise),
+    dodge.width = .8,
+    alpha = 0.4) +
+  labs(x = 'Angle', y = 'Mean RT', fill = 'Noise') +
+  scale_fill_manual(values = c('grey', 'red3')) +
+  scale_x_discrete(labels = c(0, 4, 8)) +
+  coord_cartesian(ylim = c(300, 850)) +
+  theme_bw() +
+  theme(legend.position = 'bottom')
+
+````
+
+
+## Tutorial Summary
+
+In this tutorial, we learned to wrangle data into long format using `tidyr` and `pivot_longer`, and then we learned how to fit an ANOVA very simply using `aov_ez` from the `afex` package. We also learned how to calculate simple effects using `emmip`. We then learned how to use `emmeans` to look at the estimated marginal means, and we also looked at several different ways to plot the results. I hope you found this tutorial useful! 
+
+![](https://media.giphy.com/media/3ktNekA341mVVAYr2r/giphy.gif)
+
+## Supplemental Reading
+
+Want to learn more about fitting ANOVA models? Below are some excellent supplemental readings. Some of these readings are more (B)eginner friendly and others are more (A)dvanced, and so we have marked each reading appropriately. 
+
+1. $^B$Diez, D. M., Barr, C. D., & Çetinkaya-Rundel, M. (2014). _Introductory statistics with randomization and simulation._ OpenIntro. https://www.openintro.org/book/isrs/
+
+2. $^B$Navarro, D. & Kothe, E. (2020). [Learning Statistics with R (bookdown version): 16. Factorial ANOVA](https://learningstatisticswithr.com/book/anova2.html)
+
+2. $^A$Bishop, D. (2013, June 7). [Interpreting unexpected significant results](http://deevybee.blogspot.com/2013/06/interpreting-unexpected-significant.html) 
+
+3. $^A$Feld, G. (2018, August 3). [False-positive brain: Do you really have to correct for multiple comparisons in analysis of variance?](https://neurochatter.com/false-positive-brain-do-you-really-have-to-correct-for-multiple-comparisons-in-an-analysis-of-variance/).
+
+

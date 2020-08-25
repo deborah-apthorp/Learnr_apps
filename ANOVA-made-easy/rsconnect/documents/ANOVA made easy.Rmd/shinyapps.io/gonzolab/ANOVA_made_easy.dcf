@@ -1,0 +1,12 @@
+name: ANOVA_made_easy
+title: ANOVA_made_easy
+username:
+account: gonzolab
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2703810
+bundleId: 3553821
+url: https://gonzolab.shinyapps.io/ANOVA_made_easy/
+when: 1598326183.18619
+asMultiple: FALSE
+asStatic: FALSE
