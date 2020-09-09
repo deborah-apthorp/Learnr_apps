@@ -1,7 +1,10 @@
 ---
 title: "Centering Variables, ANOVA Tables and ANCOVA"
 subtitle: "Why and how to center variables when generating ANOVA tables, and examples"
-output: learnr::tutorial
+output: 
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
 runtime: shiny_prerendered
 ---
 
@@ -16,11 +19,15 @@ afex_options(es_aov = 'pes',
 Alcohol_data <- readRDS("Alcohol_data.rds")
 knitr::opts_chunk$set(echo = FALSE)
 ```
+## Introduction
 
+This tutorial is based heavily on Mattan S. Ben-Shachar's materials, available at [Analysis of Factorial Designs FoR Psychologists](https://github.com/mattansb/Analysis-of-Factorial-Designs-foR-Psychologists). Here we're going to look at fitting an ANCOVA model with `afex`, and why it's important to center the covariate (with an illustration of the difference this makes to the results!). 
+
+The data comes from a paper, [Prenatal Alcohol Exposure Alters Error Detection During Simple Arithmetic Processing: An Electroencephalography Study](https://onlinelibrary.wiley.com/doi/abs/10.1111/acer.14244). More on this below in the Data section. 
 
 ## What Are ANOVA Tables?
 
-ANOVA tables, like regression tables, produce significance tests (and sometimes estimates of effect sizes). Unlike regression tables, where a test is given for each coefficient, in ANOVA tables a test is given by some grouping scheme: by model (of model comparison), of by factor where all coefficients that represent a categorical variable are tested in a joint test. It is the latter table, used usually in analysis of factorial data, that is discussed here.
+ANOVA tables, like regression tables, produce significance tests (and sometimes estimates of effect sizes). Unlike regression tables, where a test is given for each coefficient, in ANOVA tables a test is given by some grouping scheme: by model (of model comparison), or by factor where all coefficients that represent a categorical variable are tested in a joint test. It is the latter table, used usually in analysis of factorial data, that is discussed here.
 
 > Thesis: centering predictors changes the results given by ANOVA tables.
 
@@ -41,40 +48,38 @@ Centering of continuous variables is pretty straightforward - we subtract the me
 $$
 X_{centered} = X-\bar{X}
 $$
+
 Note that we don't have to subtract the mean; for example, if $X$ is IQ, 0 is meaningless - in fact, it's not even on the scale (with a lower bound of ~50)! I can subtract the mean of my sample, but I can also subtract 100 instead, which is the "population average". Similarly, if $X$ is "age", 0 is a day-old baby, a value that is not usually particularly meaningful.
 
 ### Categorical Variables
 
-It would seem line an impossible task - how can you subtract any numeric value from a categorical variable? This is true, but the idea of a "*meaningful 0*" is that in our model giving a value of 0 to this $X$ will represent the average across all level of $X$. When modeling categorical variables, this means setting all dummy variables to 0.
+It would seem line an impossible task - how can you subtract any numeric value from a categorical variable? This is true, but the idea of a *"meaningful 0"* is that in our model giving a value of 0 to this $X$ will represent the average across all level of $X$. When modeling categorical variables, this means setting all dummy variables to 0.
 
-Usually, dummy variables are generated using a treatment scheme, such that 0 represents some "baseline" group. But there are other coding schemes, some of which give 0 the meaning we're looking for - for example, [effects coding](https://stats.idre.ucla.edu/other/mult-pkg/faq/general/faqwhat-is-effect-coding/) ([Aiken, et al., 1991, pp. 127](https://books.google.co.il/books?hl=iw&lr=&id=LcWLUyXcmnkC); [Singmann & Kellen, 2017, pp. 24](http://singmann.org/download/publications/singmann_kellen-introduction-mixed-models.pdf)).^[Unfortunately, this makes the interpretation of the actual coefficient not as straightforward as when using treatment coding...] ^[When conducting ANOVAs with [`afex`](https://cran.r-project.org/package=afex), you don't need to worry about setting effects coding, as `afex` [takes care of this for you](https://github.com/singmann/afex/issues/63). However when conducting ANCOVAs with `afex`, continuous variables [**are not centered**](https://github.com/singmann/afex/issues/59) (but a warning is given), and you have to do that yourself. This is also true for JASP (that has `afex` under the hood) and even for SPSS (but if you're still using SPSS, this might be the least of your problems...).]
+Usually, dummy variables are generated using a treatment scheme, such that 0 represents some "baseline" group. But there are other coding schemes, some of which give 0 the meaning we're looking for - for example, [effects coding](https://stats.idre.ucla.edu/other/mult-pkg/faq/general/faqwhat-is-effect-coding/) ([Aiken, et al., 1991, pp. 127](https://books.google.co.il/books?hl=iw&lr=&id=LcWLUyXcmnkC); [Singmann & Kellen, 2017, pp. 24](http://singmann.org/download/publications/singmann_kellen-introduction-mixed-models.pdf)). $^{1,2}$
 
-In `R` this can be done by setting
+In `R` this can be done by setting `options(contrasts=c('contr.sum', 'contr.poly'))`
 
-```{r, eval=FALSE}
-options(contrasts=c('contr.sum', 'contr.poly'))
-```
+Or for a single factor: `contrasts(iris$Species) <- contr.sum`
 
-Or for a single factor:
+$^1$ Unfortunately, this makes the interpretation of the actual coefficient not as straightforward as when using treatment coding... 
 
-```{r, eval=FALSE}
-contrasts(iris$Species) <- contr.sum
-```
+$^2$ When conducting ANOVAs with [`afex`](https://cran.r-project.org/package=afex), you don't need to worry about setting effects coding, as `afex` [takes care of this for you](https://github.com/singmann/afex/issues/63). However when conducting ANCOVAs with `afex`, continuous variables [**are not centered**](https://github.com/singmann/afex/issues/59) (but a warning is given), and you have to do that yourself. This is also true for JASP (that has `afex` under the hood) and even for SPSS (but if you're still using SPSS, this might be the least of your problems...).
 
 
 ### Addendum
 
 When generating ANOVA tables, the $SS$ of factor $A$ are computed with all other coefficients held constant at 0 (similar to how coefficients are interpreted as simple slopes in moderation analysis). If factor $B$ has a treatment coding scheme, then when the coefficients of factor $B$ are 0, there actually represent the baseline group, as so the effect for $A$ is actually the simple effect of $A$ and not the main effect!
 
-
-"But wait!", I hear you shout, "When we learned ANOVA in Intro to stats, we weren't taught to center any variables!".
+> "But wait!", I hear you shout, "When we learned ANOVA in Intro to Stats, we weren't taught to center any variables!".
 
 This is true - you didn't explicitly learn this, but taking a closer look at the equations of the various $SS$s will reveal that you've been doing just that all along. 
 
-For $SS_A$:
+For $SS_A$: 
+
 $$
 SS_A = n\sum (\bar{X}_{i.}-\bar{X}_{..})^2
 $$
+
 When $\bar{X}_{i.}$ is itself the mean of group $i$ of factor $A$ *beyond* the levels of factor $B$ (as denoted by the $.$)!
 
 We can even re-write the equation for $SS_A$ to show this explicitly:
@@ -83,41 +88,24 @@ $$
 SS_A = n\sum (\bar{X}_{i.}-\bar{X}_{..})^2 = 
 n\sum\sum (\bar{X}_{ij}-(\bar{X}_{.j}-\bar{X}_{..})-(\bar{X}_{ij}-\bar{X}_{.j}-\bar{X}_{ij}+\bar{X}_{..})-\bar{X}_{..})^2
 $$
+
 Where $(\bar{X}_{.j}-\bar{X}_{..})$ is the centering of factor $B$ (subtracting from *all* group means, the total mean).
 
 This is also why centering a variable only affects the lower-order effects of *other* variables.
 
+## The data
 
+The data comes from a paper, [Prenatal Alcohol Exposure Alters Error Detection During Simple Arithmetic Processing: An Electroencephalography Study](https://onlinelibrary.wiley.com/doi/abs/10.1111/acer.14244).
 
-### Exercise 
+In this study, children of mothers who had consumed alcohol during pregnancy were followed up by specialists and diagnosed with fetal alcohol syndrome (FAS), partial fetal alcohol syndrome (PFAS), or non-dysmorphic (the whole group are referred to as P), and were compared to controls. They had EEG recorded during a simple arithmetic task, and the results were examined for error-related negativity, an event-related potential pattern that shows a difference when participants observe an incorrect solution to a problem. In this experiment, the solution could either be correct (Crr), discrepant by 1 (L1) or discrepant by 5 (L5). The relevant results are time-frequency analyses, presented as event-related spectral perturbations (`ersp`) in four different frequency bands: delta (1 to 3 Hz), theta (4 to 7 Hz), alpha (8 to 12 Hz), and beta (13 to 30 Hz). The mother's level of education (the grade at which she left school) was also recorded. Note that these were adolescent children from the "Cape Coloured" community in the Cape Town area in South Africa, a community which is very disadvantaged and where, for historical reasons, there is a very high prevalence of fetal alcohol syndrome. From the paper: 
 
-*Here's a simple exercise with an empty code chunk provided for entering the answer.*
-
-Write the R code required to add two plus two:
-
-```{r two-plus-two, exercise=TRUE}
-
-```
-
-### Exercise with Code
-
-*Here's an exercise with some prepopulated code as well as `exercise.lines = 5` to provide a bit more initial room to work.*
-
-Now write a function that adds any two numbers and then call it:
-
-```{r add-function, exercise=TRUE, exercise.lines = 5}
-add <- function() {
-  
-}
-```
-
-## Fit the ANOVA model
+> This study was conducted in Cape Town, South Africa, wherethe prevalence of FASD in the Cape Coloured (mixed ancestry) community is among the highest in the world (13.6 to 20.9%) and where the incidence of FAS has been estimated to be 18 to 141 times greater than in the United States (May et al., 2013). This population, composed of descendants of White European settlers, Malaysian slaves, Khoi-San aboriginals, and Black Africans, has historically comprised the majority of workers in the wine-producing region of the Western Cape. The prevalence of FAS in this community is a consequence of very heavy maternal drinking during pregnancy (Croxford and Viljoen, 1999), which, in turn, is due in part to poor psychosocial circumstances and the traditional *dop* system, whereby farm laborers were paid, in part, with wine. Although the *dop* system has been outlawed and despite numerous efforts to reduce pregnancy drinking, weekend binge drinking persists in a high proportion of women during pregnancy in rural and urban Cape Coloured communities (Mayet al., 2013).
 
 Let's load the data using `Alcohol_data <- readRDS("Alcohol_data.rds")` - already done in the header - and have a look at the data using the code you learned in the last tutorial! 
 
 ### Look at the data
 
-Modify the following code to limit the number of rows printed to 6:
+Modify the following code to show just the first few rows the data:
 
 ```{r data-examine, exercise=TRUE, exercise.eval=TRUE}
 Alcohol_data
@@ -128,9 +116,9 @@ head(Alcohol_data)
 ```
 
 
-### Fit the model
+## Fit the ANOVA model
 
-OK, let's go ahead and fit the ANOVA model using `aov_ez`. We're going to call the model `ersp_anova`, because the main outcome variable is the ERSP (event-related synaptic potential, an EEG measure). The within-subject factors are Freqency and Correctness, and the between-subjects factor is Alcohol. 
+OK, let's go ahead and fit the ANOVA model using `aov_ez`. We're going to call the model `ersp_anova`, because the main outcome variable is the ERSP (event-related synaptic potential, an EEG measure). The within-subject factors are Frequency and Correctness, and the between-subjects factor is Alcohol. Amend the code below to produce this model! 
 
 
 ```{r fit-model, exercise = TRUE}
@@ -142,20 +130,43 @@ ersp_anova <- aov_ez('Subject', 'ersp', Alcohol_data,
 
 
 ```{r fit-model-solution}
-ersp_anova <- aov_ez('Subject','ersp',Alcohol_data,
+ersp_anova <- aov_ez('Subject','ersp', Alcohol_data,
                      within = c('Frequency','Correctness'),
                      between = c('Alcohol'))
 ersp_anova
 
 ```
+### Check your understanding
 
-But mother's education level is related to the outcome.
+```{r quiz-ANOVA}
+quiz(caption = "ANOVA Quiz",
+  question("Which of the following is true?",
+           answer("There is a significant main effect of correctness"),
+           answer("There is a significant interaction between alcohol group and correctness"),
+           answer("There is a significant interaction between frequency band and correctness", correct = TRUE),
+           answer("There is a significant three-way interaction"), 
+           allow_retry = TRUE, 
+           random_answer_order = TRUE           
+  ),
+
+  question("What is the effect size for the main effect of freqency?",
+           answer(".471", correct = TRUE),
+           answer("39.15", message = "No, that's the test statistic!"),
+           answer("102.25", message = "No, that's the degrees of freedom for error! "),
+           answer(".144", message = "No, that's the effect size for the Alchol:Frequency interaction!"),
+           allow_retry = TRUE, 
+           random_answer_order = TRUE)
+  
+)
+```
+
+However, the mother's education level might be related to the outcome.
 
 We probably would want to control for it - to reduce the MSE.
 
-### Fit ANCOVA model
+## Fit the ANCOVA model
 
-Keep in mind that some have argued that the use (or misuse) of ANCOVA should be avoided. See: [here](http://doi.org/10.1037//0021-843X.110.1.40) for more details. 
+Keep in mind that some have argued that the use (or misuse) of ANCOVA should be avoided. See: [Miller & Chapman, 2001 (pdf link)](http://apsychoserver.psych.arizona.edu/JJBAReprints/PSYC501A/Readings/Miller_Chapman_JAP_2001.pdf) for more details. 
 
 Copy the code from above, but call the new model `ersp_ancova`, and add in the covariate `mograde`. Be sure to set `factorize = FALSE` at the end! 
 
@@ -166,7 +177,7 @@ Copy the code from above, but call the new model `ersp_ancova`, and add in the c
 
 
 ```{r fit-ancova-model-solution}
-ersp_ancova <- aov_ez('Subject','ersp',Alcohol_data,
+ersp_ancova <- aov_ez('Subject','ersp', Alcohol_data,
                       within = c('Frequency','Correctness'),
                       between = c('Alcohol'),
                       # The new bits:
@@ -174,32 +185,61 @@ ersp_ancova <- aov_ez('Subject','ersp',Alcohol_data,
                       factorize = FALSE) # MUST set `factorize = FALSE`!
 ersp_ancova
 ```
+
+
 Note the warning! What does this mean, and how will we fix it? 
+
+### Check your understanding
+
+```{r ANCOVA-quiz}
+quiz( caption = "ANCOVA Quiz 1",
+  question("Which of the following is true?",
+           answer("There is a significant main effect of correctness"),
+           answer("There is a significant interaction between mother's education and frequency band"),
+           answer("There is a significant interaction between mother's education and correctness", ),
+           answer("None of the effects in the model are significant", correct = TRUE), 
+           allow_retry = TRUE, 
+           random_answer_order = TRUE           
+  ),
+
+  question("What do you think is the reason for the above results?",
+           answer("The covariate was not centered", correct = TRUE),
+           answer("The mother's level of education explains all of the variance in the model"),
+           answer("There are too many variables for the size of the sample"),
+           answer("There is nothing wrong with these results"),
+           allow_retry = TRUE, 
+           random_answer_order = TRUE)
+  
+)
+```
 
 
 ### Center the covariate 
 
 Let's make a new column with `mograde` centered - we'll used the `scale` command, and set `center` to `TRUE` but `scale` to `FALSE`: 
 
-```{r center-covariate, exercise = TRUE, exercise.eval = TRUE}
+```{r center-covariate, exercise=TRUE, exercise.eval = TRUE}
 Alcohol_data$mograde_c <- scale(Alcohol_data$mograde,
                                 center = TRUE, scale = FALSE)
-
+head(Alcohol_data)
 ```
 
 
 ### Re-fit the model
 
 OK, so now let's re-fit the model from above, but with the centered covariate instead! you need to use your new variable `mograde_c`. Amend the code from above, but now add the new centered covariate. 
+```{r prepare-ancova-2}
+Alcohol_data$mograde_c <- scale(Alcohol_data$mograde,
+                                center = TRUE, scale = FALSE)
+```
 
-
-```{r fit-ancova-model-2, exercise = TRUE, exercise.eval = TRUE}
+```{r fit-ancova-model-2, exercise = TRUE, exercise.setup = "prepare-ancova-2"}
 
 
 ```
 
 
-```{r fit-ancova-model-2-solution, exercise.eval = TRUE}
+```{r fit-ancova-model-2-solution}
 ersp_ancova_2 <- aov_ez('Subject','ersp',Alcohol_data,
                       within = c('Frequency','Correctness'),
                       between = c('Alcohol'),
@@ -211,40 +251,61 @@ ersp_ancova_2
 
 Huh! Look at the difference! 
 
-### Make the table prettier
+### Check your answers
 
-It's nice to present the table in a more readable format. We're going to use the `kableextra` package, along with `tidyverse`, to put the ANOVA table into a data frame and format it nicely as a table. 
+```{r ANCOVA-quiz-2}
+quiz( caption = "ANCOVA Quiz 2",
+      
+      question("What is the value of the test statistic for the interaction between frequency and correctness?",
+               answer("5.99", correct = TRUE),
+               answer(".122"),
+               answer("4.28"),
+               answer(".92"),
+               allow_retry = TRUE, 
+               random_answer_order = TRUE),
+      
+      question("Which of the following is true?",
+               answer("There is a significant main effect of correctness"),
+               answer("There is a significant interaction between mother's education and correctness"),
+               answer("There is a significant effect of mother's education on ERSP results", ),
+               answer("The main between-subjects effect of alcohol is non-significant after controlling for mother's education level", correct = TRUE), 
+               allow_retry = TRUE, 
+               random_answer_order = TRUE           
+      )
+      
+)
+```
 
+## Make a nicer tables for the ANCOVA model using Kable
 
-```{r kable-styling, exercise = TRUE}
+It's nice to present the table in a more readable format. We're going to use the `kableextra` package, along with `tidyverse`, to put the ANOVA table into a data frame and format it nicely as a table. We can also control the number of digits in each column. 
 
+```{r prepare-kable}
+Alcohol_data$mograde_c <- scale(Alcohol_data$mograde,
+                                center = TRUE, scale = FALSE)
+ersp_ancova_2 <- aov_ez('Subject','ersp',Alcohol_data,
+                      within = c('Frequency','Correctness'),
+                      between = c('Alcohol'),
+                      # The new bits:
+                      covariate = 'mograde_c',
+                      factorize = FALSE) # MUST set `factorize = FALSE`!
+```
+
+```{r kable-styling, exercise = TRUE, exercise.setup = "prepare-kable"}
 ersp_ancova_table <- as.data.frame(ersp_ancova_2$anova_table) # force ANOVA table into data frame
 
 ersp_ancova_table %>%
-  kable(caption = "ANCOVA results with centered covariate") %>%
-  kable_styling()
+  kable(caption = "ANCOVA results with centered covariate", digits = c(2,2,2,2,3,3)) %>% 
+  # using Kable options, give a caption and set the number of digits in each column of the table
+  kable_styling() # Use the default styling 
 ```
 
-### Quiz
+### APA style tables 
 
-*You can include any number of single or multiple choice questions as a quiz. Use the `question` function to define a question and the `quiz` function for grouping multiple questions together.*
+If you'd like to have tables that are closer to APA style, the `papaja` package has some great functionality, or also see [this post](https://www.datadreaming.org/post/apa-tables-using-rmarkdown/) for an alternative, somewhat simpler approach. 
 
-Some questions to verify that you understand the purposes of various base and recommended R packages:
 
-```{r quiz}
-quiz(
-  question("Which package contains functions for installing other R packages?",
-    answer("base"),
-    answer("tools"),
-    answer("utils", correct = TRUE),
-    answer("codetools")
-  ),
-  question("Which of the R packages listed below are used to create plots?",
-    answer("lattice", correct = TRUE),
-    answer("tools"),
-    answer("stats"),
-    answer("grid", correct = TRUE)
-  )
-)
-```
+## Tutorial Summary
+
+In this tutorial, we learned why it's important to center covariates in ANCOVA, and that `R` does not do it automatically. We first fitted a basic ANOVA model to the data using `aov_ez`, and then looked at the effect of adding a covariate without centering it. Then we wrangled the data a little to produce a new variable that was the centered covariate, using `scale`, and then re-fitted the ANCOVA with the centered covariate.  Finally we had a quick look at making our table prettier using `kableextra` and `tidyverse`. I hope you found this tutorial useful! 
 
